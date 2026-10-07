@@ -8,6 +8,7 @@ export const BOUNTIES = `${REALM_ROOT}/bounties`
 export const REPUTATION = `${REALM_ROOT}/reputation`
 export const GOVDAO = `${REALM_ROOT}/govdao`
 export const GNOWEB_URL = import.meta.env.VITE_GNOWEB_URL
+export const REALMS_REPO_URL = 'https://github.com/clockworkgr/guildhall'
 
 export interface Network {
   rpcUrl: string

@@ -27,6 +27,7 @@ const paths: Record<string, string> = {
   logout: 'M9 3H3v18h6M9 12h12M17 8l4 4-4 4',
   refresh: 'M20 7a9 9 0 1 0 1 8M20 3v5h-5',
   info: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0M12 11v6M12 7h.01',
+  code: 'm8 6-6 6 6 6M16 6l6 6-6 6',
   spark: 'm12 3 2.7 6.3L21 12l-6.3 2.7L12 21l-2.7-6.3L3 12l6.3-2.7z',
 }
 </script>

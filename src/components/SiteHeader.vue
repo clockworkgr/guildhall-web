@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWallet } from '../composables/wallet'
 import { shortAddr } from '../lib/format'
-import { defaultNetwork, getNetwork, setNetwork } from '../lib/config'
+import { REALMS_REPO_URL, defaultNetwork, getNetwork, setNetwork } from '../lib/config'
 import Hallmark from './Hallmark.vue'
 import Icon from './Icon.vue'
 
@@ -86,6 +86,7 @@ onBeforeUnmount(() => { document.removeEventListener('click', clickOutside); doc
     <div class="mt-auto pt-10">
       <RouterLink to="/how" class="sidebar-link"><Icon name="book" :size="19" />How it works</RouterLink>
       <RouterLink to="/admin" class="sidebar-link"><Icon name="settings" :size="19" />Guild settings</RouterLink>
+      <a :href="REALMS_REPO_URL" target="_blank" rel="noopener noreferrer" class="sidebar-link"><Icon name="code" :size="19" />Realm source</a>
       <div class="mt-5 mx-3 pt-5 border-t border-rule">
         <p class="text-xs font-medium text-ink-soft flex items-center gap-2"><span class="network-dot" /> Built on gno.land</p>
         <p class="text-[11px] text-ink-faint mt-1.5">Good work leaves a mark.</p>
