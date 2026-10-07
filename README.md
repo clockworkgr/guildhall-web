@@ -4,7 +4,7 @@ A Vue 3 + Vite front end for the [Guildhall](https://onyx.testnets.gno.land/r/g1
 realms on the gno.land Onyx testnet. It has no backend: it reads straight from
 a gno.land node over RPC and signs with the [Adena](https://adena.app) wallet.
 
-Live at <https://clockworkgr.github.io/guildhall-web/>.
+Live at <https://guildhall.clockwork.gr>.
 
 ## Run it
 
@@ -23,8 +23,10 @@ unknown paths (Netlify `_redirects`, Vercel rewrites, nginx `try_files`, …).
 
 ## Deployment
 
-`.github/workflows/pages.yml` builds with `BASE_PATH=/guildhall-web/` on every
-push to `main` and publishes `dist/` to GitHub Pages. It copies `index.html` to
+`.github/workflows/pages.yml` builds on every push to `main` and publishes
+`dist/` to GitHub Pages, served at the custom domain `guildhall.clockwork.gr`
+(set in the repository's Pages settings). If the site ever moves back to
+`<user>.github.io/guildhall-web/`, build with `BASE_PATH=/guildhall-web/`. It copies `index.html` to
 `404.html` so that deep links such as `/bounty/3` load the app.
 
 ## Configuration
