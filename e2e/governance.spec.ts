@@ -1,0 +1,56 @@
+import { test, expect, addresses } from './fixtures'
+
+test('settings are readable but administrative controls require the correct wallet', async ({page,app}) => {
+  await page.goto('/admin')
+  await expect(page.getByText('Connect your wallet to see the settings you can manage.',{exact:true})).toBeVisible()
+  await app.connect(addresses.worker)
+  await expect(page.getByText(/this page is read-only for you/)).toBeVisible()
+  await expect(page.getByRole('button',{name:'Add seed'})).toHaveCount(0)
+  await expect(page.getByRole('button',{name:'Pause new bounties'})).toHaveCount(0)
+  expect(app.txs).toHaveLength(0)
+})
+
+test('admin manages seed reviewers and voids a record with a reason', async ({page,app}) => {
+  await page.goto('/admin'); await app.connect(addresses.council)
+  await page.getByRole('textbox',{name:'Seed address'}).fill(addresses.visitor)
+  await page.getByRole('button',{name:'Add seed'}).click()
+  await expect(page.getByRole('status')).toContainText('Seed added.')
+  const seed = page.locator('li').filter({has:page.locator(`a[href="/u/${addresses.visitor}"]`)})
+  await seed.getByRole('button',{name:'Remove',exact:true}).click()
+  await expect(page.getByRole('status')).toContainText('Seed removed.')
+  await page.getByRole('spinbutton',{name:'Record number'}).fill('1')
+  await page.getByRole('textbox',{name:'Reason',exact:true}).fill('Fraudulent duplicate submission')
+  await page.getByRole('button',{name:'Void record',exact:true}).click()
+  await expect(page.getByRole('status')).toContainText('Record voided.')
+  expect(app.txs.map(t => t.messages[0]!.value.func)).toEqual(['AddSeed','RemoveSeed','VoidRecord'])
+  expect(app.txs[2]!.messages[0]!.value.args).toEqual(['1','Fraudulent duplicate submission'])
+  await page.goto('/record/1')
+  await expect(page.getByRole('alert')).toContainText('Fraudulent duplicate submission')
+})
+
+test('council pauses, resumes, and transfers the seat', async ({page,app}) => {
+  await page.goto('/admin'); await app.connect(addresses.council)
+  await page.getByRole('button',{name:'Pause new bounties'}).click()
+  await expect(page.getByRole('status')).toContainText('Posting paused.')
+  await page.getByRole('button',{name:'Resume posting'}).click()
+  await expect(page.getByRole('status')).toContainText('Posting resumed.')
+  await page.getByRole('textbox',{name:'Hand the council seat to'}).fill('bad')
+  await expect(page.getByRole('button',{name:'Hand over',exact:true})).toBeDisabled()
+  await page.getByRole('textbox',{name:'Hand the council seat to'}).fill(addresses.visitor)
+  await page.getByRole('button',{name:'Hand over',exact:true}).click()
+  await expect(page.getByRole('status')).toContainText('Council seat handed over.')
+  await expect(page.getByRole('button',{name:'Pause new bounties'})).toHaveCount(0)
+  expect(app.txs.map(t => t.messages[0]!.value.args)).toEqual([['true'],['false'],[addresses.visitor]])
+})
+
+test('admin and council controls stay separate when held by different accounts', async ({page,app}) => {
+  app.admin = addresses.reviewer
+  await page.goto('/admin'); await app.connect(addresses.reviewer)
+  await expect(page.getByRole('button',{name:'Add seed'})).toBeVisible()
+  await expect(page.getByRole('button',{name:'Pause new bounties'})).toHaveCount(0)
+  await app.setWallet(addresses.council)
+  await expect(page.getByRole('button',{name:'Add seed'})).toHaveCount(0)
+  await expect(page.getByRole('button',{name:'Void record',exact:true})).toHaveCount(0)
+  await expect(page.getByRole('button',{name:'Pause new bounties'})).toBeVisible()
+  expect(app.txs).toHaveLength(0)
+})

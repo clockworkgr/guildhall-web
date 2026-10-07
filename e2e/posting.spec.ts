@@ -1,0 +1,123 @@
+import { test, expect, addresses, token } from './fixtures'
+import type { Page } from '@playwright/test'
+async function fillTask(page: Page) {
+  await page.getByRole('textbox',{name:'Title',exact:true}).fill('Create an accessible realm dashboard')
+  await page.getByRole('textbox',{name:'Description',exact:true}).fill('## Deliverables\nA **beautiful** dashboard with keyboard navigation.')
+  await page.getByRole('textbox',{name:'Milestone 1 name'}).fill('Prototype')
+  await page.getByRole('textbox',{name:'Milestone 1 amount'}).fill('12.5')
+}
+
+test('native bounty posting validates, previews, totals milestones, and funds escrow', async ({page,app}) => {
+  await page.goto('/post'); await app.connect(addresses.poster)
+  await page.getByRole('button',{name:'Post and fund 0 GNOT'}).click()
+  await expect(page.getByRole('alert')).toContainText('Fix the highlighted fields')
+  await expect(page.getByRole('textbox',{name:'Title',exact:true})).toBeFocused()
+  expect(app.txs).toHaveLength(0)
+  await fillTask(page)
+  await page.getByRole('button',{name:'Preview',exact:true}).click()
+  await expect(page.locator('.prose-guild strong')).toHaveText('beautiful')
+  await page.getByRole('button',{name:'Edit',exact:true}).click()
+  await expect(page.getByRole('textbox',{name:'Description'})).toHaveValue(/beautiful/)
+  await page.getByRole('textbox',{name:'Tags',exact:true}).fill('design, gno')
+  await page.getByRole('textbox',{name:'Reference link'}).fill('https://github.com/gnolang/gno/issues/1')
+  await page.getByRole('button',{name:'Add a milestone'}).click()
+  await page.getByRole('textbox',{name:'Milestone 2 name'}).fill('Build')
+  await page.getByRole('textbox',{name:'Milestone 2 amount'}).fill('7.5')
+  await expect(page.getByRole('button',{name:'Post and fund 20 GNOT'})).toBeVisible()
+  await page.getByRole('button',{name:'Post and fund 20 GNOT'}).click()
+  await expect(page).toHaveURL(/\/bounty\/8$/)
+  await expect(page.getByRole('heading',{name:'Create an accessible realm dashboard'})).toBeVisible()
+  expect(app.txs).toHaveLength(1)
+  expect(app.txs[0]!.messages).toEqual([{type:'/vm.m_call',value:{caller:addresses.poster, send:'20000000ugnot',max_deposit:'',pkg_path:expect.stringContaining('/bounties'),func:'PostBounty',args:['Create an accessible realm dashboard','## Deliverables\nA **beautiful** dashboard with keyboard navigation.','https://github.com/gnolang/gno/issues/1','design, gno','','0','Prototype=12500000;Build=7500000','','30']}}])
+})
+
+test('GRC20 posting bundles token approval and bounty funding atomically', async ({page,app}) => {
+  await page.goto('/post'); await app.connect(addresses.poster); await fillTask(page)
+  await page.getByRole('combobox',{name:'Pay in'}).selectOption(token.key)
+  await page.getByRole('button',{name:'Post and fund 12.5 GLD'}).click()
+  await expect(page).toHaveURL(/\/bounty\/8$/)
+  const messages = app.txs[0]!.messages
+  expect(messages).toHaveLength(2)
+  expect(messages[0]!.value).toMatchObject({func:'Approve',pkg_path:token.key.slice(0,token.key.lastIndexOf('.')),args:[addresses.realm,'1250'],send:''})
+  expect(messages[1]!.value).toMatchObject({func:'PostBountyGRC20',send:''})
+  expect(messages[1]!.value.args[0]).toBe(token.key)
+  expect(messages[1]!.value.args[7]).toBe('Prototype=1250')
+})
+
+test('reviewers, quorum, custom arbiter, and milestone removal are reflected in the signed terms', async ({page,app}) => {
+  await page.goto('/post'); await app.connect(addresses.poster); await fillTask(page)
+  await page.getByRole('button',{name:'Add a milestone'}).click()
+  await page.getByRole('button',{name:'Remove milestone 2'}).click()
+  await expect(page.getByRole('textbox',{name:'Milestone 2 name'})).toHaveCount(0)
+  await expect(page.getByRole('button',{name:'Remove milestone 1'})).toBeDisabled()
+  const input = page.getByRole('textbox',{name:'Reviewers',exact:true})
+  await input.fill('invalid'); await expect(page.getByRole('button',{name:'Add',exact:true})).toBeDisabled()
+  await input.fill(addresses.reviewer); await page.getByRole('button',{name:'Add',exact:true}).click()
+  await input.fill(addresses.reviewer); await expect(page.getByText('Already added.',{exact:true})).toBeVisible()
+  await input.fill(addresses.reviewer2); await input.press('Enter')
+  await page.getByRole('combobox',{name:'Approvals needed per milestone'}).selectOption('2')
+  await page.getByRole('radio',{name:'Someone I choose'}).check()
+  await page.getByRole('textbox',{name:'Arbiter address'}).fill(addresses.council)
+  await page.getByRole('spinbutton',{name:'Work window'}).fill('45')
+  await page.getByRole('button',{name:'Post and fund 12.5 GNOT'}).click()
+  await expect(page).toHaveURL(/\/bounty\/8$/)
+  expect(app.txs[0]!.messages[0]!.value.args.slice(4)).toEqual([`${addresses.reviewer},${addresses.reviewer2}`,'2','Prototype=12500000',addresses.council,'45'])
+})
+
+test('invalid amounts, links, tags, arbiter and work windows block signing', async ({page,app}) => {
+  await page.goto('/post'); await app.connect(addresses.poster); await fillTask(page)
+  await page.getByRole('textbox',{name:'Reference link'}).fill('javascript:alert(1)')
+  await page.getByRole('textbox',{name:'Tags',exact:true}).fill('Not a tag')
+  await page.getByRole('textbox',{name:'Milestone 1 amount'}).fill('1.0000001')
+  await page.getByRole('radio',{name:'Someone I choose'}).check()
+  await page.getByRole('textbox',{name:'Arbiter address'}).fill('nope')
+  await page.getByRole('spinbutton',{name:'Work window'}).fill('366')
+  await page.getByRole('button',{name:'Post and fund 0 GNOT'}).click()
+  await expect(page.getByText('Use a full link starting with https://.',{exact:true})).toBeVisible()
+  await expect(page.getByText('Choose between 1 and 365 days.',{exact:true})).toBeVisible()
+  await expect(page.getByRole('textbox',{name:'Milestone 1 amount'})).toHaveAttribute('aria-invalid','true')
+  expect(app.txs).toHaveLength(0)
+})
+
+test('paused posting stays disabled', async ({page,app}) => {
+  app.paused = true
+  await page.goto('/post'); await app.connect(addresses.poster); await fillTask(page)
+  await expect(page.getByRole('alert')).toContainText('Posting is paused')
+  await expect(page.getByRole('button',{name:'Post and fund 12.5 GNOT'})).toBeDisabled()
+  expect(app.txs).toHaveLength(0)
+})
+
+test('wallet rejection keeps the form and can be retried', async ({page,app}) => {
+  await page.goto('/post'); await app.connect(addresses.poster); await fillTask(page)
+  app.nextTxError = 'reject'
+  await page.getByRole('button',{name:'Post and fund 12.5 GNOT'}).click()
+  await expect(page.getByRole('alert')).toContainText('You rejected the transaction in Adena')
+  await expect(page.getByRole('textbox',{name:'Title',exact:true})).toHaveValue('Create an accessible realm dashboard')
+  await page.getByRole('button',{name:'Post and fund 12.5 GNOT'}).click()
+  await expect(page).toHaveURL(/\/bounty\/8$/)
+  expect(app.txs).toHaveLength(2)
+})
+
+test('removing a reviewer adjusts quorum to the remaining reviewers', async ({page,app}) => {
+  await page.goto('/post'); await app.connect(addresses.poster); await fillTask(page)
+  const input = page.getByRole('textbox',{name:'Reviewers',exact:true})
+  await input.fill(addresses.reviewer); await input.press('Enter')
+  await input.fill(addresses.reviewer2); await input.press('Enter')
+  await page.getByRole('combobox',{name:'Approvals needed per milestone'}).selectOption('2')
+  await page.getByRole('button',{name:`Remove reviewer ${addresses.reviewer2}`}).click()
+  await expect(page.getByRole('combobox',{name:'Approvals needed per milestone'})).toHaveCount(0)
+  await page.getByRole('button',{name:'Post and fund 12.5 GNOT'}).click()
+  await expect(page).toHaveURL(/\/bounty\/8$/)
+  expect(app.txs[0]!.messages[0]!.value.args.slice(4,6)).toEqual([addresses.reviewer,'1'])
+})
+
+test('token metadata errors can be retried without losing the draft', async ({page,app}) => {
+  app.failures.set('bounties:api/tokens','Registry unavailable')
+  await page.goto('/post'); await fillTask(page)
+  await expect(page.getByRole('alert')).toContainText('Registry unavailable')
+  app.failures.clear()
+  await page.getByRole('button',{name:'Try again'}).click()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await page.getByRole('combobox',{name:'Pay in'}).selectOption(token.key)
+  await expect(page.getByRole('textbox',{name:'Title',exact:true})).toHaveValue('Create an accessible realm dashboard')
+})

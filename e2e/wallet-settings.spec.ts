@@ -1,0 +1,96 @@
+import { test, expect, addresses } from './fixtures'
+
+test('wallet connects, restores, changes accounts, and stays disconnected', async ({page,app}) => {
+  await page.goto('/')
+  await app.connect()
+  expect(app.walletCalls).toContain('AddEstablish')
+  await page.reload()
+  await expect(page.getByRole('button',{name:'Wallet menu'})).toBeVisible()
+  await app.setWallet(addresses.reviewer)
+  await page.getByRole('button',{name:'Wallet menu'}).click()
+  await page.getByRole('link',{name:'Your profile',exact:true}).click()
+  await expect(page).toHaveURL(new RegExp(`/u/${addresses.reviewer}$`))
+  await expect(page.getByRole('heading',{name:'Your record'})).toBeVisible()
+  await page.getByRole('button',{name:'Wallet menu'}).click()
+  await page.getByRole('button',{name:'Disconnect',exact:true}).click()
+  await app.setWallet(addresses.worker)
+  await expect(page.getByRole('button',{name:'Wallet menu'})).toHaveCount(0)
+  expect(await page.evaluate(() => localStorage.getItem('guildhall.connected'))).toBeNull()
+})
+
+test('connection failures are visible and allow another attempt', async ({page,app}) => {
+  app.nextConnectError = 'Unlock your Adena wallet.'
+  await page.goto('/')
+  await page.locator('.app-topbar').getByRole('button',{name:/^Connect( wallet)?$/}).click()
+  await expect(page.getByRole('alert')).toContainText('Unlock your Adena wallet')
+  app.nextConnectError = ''
+  await app.connect()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+})
+
+test('connecting switches to the configured chain and signing guards network changes', async ({page,app}) => {
+  await page.goto('/bounty/1')
+  await app.setWallet(addresses.worker,'wrong-chain')
+  await page.locator('.app-topbar').getByRole('button',{name:/^Connect( wallet)?$/}).click()
+  await expect(page.getByRole('button',{name:'Wallet menu'})).toBeVisible()
+  expect(app.walletCalls).toContain('SwitchNetwork')
+  await app.setWallet(addresses.worker,'another-chain')
+  await page.getByRole('textbox',{name:'Why you'}).fill('I can deliver this.')
+  await page.getByRole('button',{name:'Apply for this bounty'}).click()
+  await expect(page.getByRole('alert')).toContainText('Switch your wallet to guildhall-test')
+  expect(app.txs).toHaveLength(0)
+})
+
+test('wallet menu closes with escape and outside clicks', async ({page,app}) => {
+  await page.goto('/'); await app.connect()
+  const wallet = page.getByRole('button',{name:'Wallet menu'})
+  await wallet.click(); await expect(page.getByRole('button',{name:'Disconnect'})).toBeVisible()
+  await page.keyboard.press('Escape'); await expect(wallet).toHaveAttribute('aria-expanded','false'); await expect(wallet).toBeFocused()
+  await wallet.click(); await page.getByRole('heading',{level:1}).click(); await expect(wallet).toHaveAttribute('aria-expanded','false')
+})
+
+test('theme toggles and persists after reload', async ({page,app}) => {
+  await page.goto('/')
+  await page.getByRole('button',{name:'Use dark theme'}).click()
+  await expect(page.locator('html')).toHaveClass('dark')
+  await page.reload()
+  await expect(page.locator('html')).toHaveClass('dark')
+  await page.getByRole('button',{name:'Use light theme'}).click()
+  await expect(page.locator('html')).not.toHaveClass('dark')
+  expect(app.txs).toHaveLength(0)
+})
+
+test('network settings validate, persist, reset, and close accessibly', async ({page,app}) => {
+  await page.goto('/')
+  const trigger = page.getByRole('button',{name:'Network settings',exact:true})
+  await trigger.click()
+  const dialog = page.getByRole('dialog',{name:'Network settings'})
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('textbox',{name:'RPC endpoint'}).fill('ftp://example.com')
+  await dialog.getByRole('button',{name:'Use this network'}).click()
+  await expect(dialog.getByRole('alert')).toContainText('HTTP or HTTPS')
+  await dialog.getByRole('textbox',{name:'RPC endpoint'}).fill('https://rpc.example.test')
+  await dialog.getByRole('textbox',{name:'Chain ID'}).fill('test-alternate')
+  await dialog.getByRole('button',{name:'Use this network'}).click()
+  await expect(dialog).not.toBeVisible()
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('guildhall.network')!))).toEqual({rpcUrl:'https://rpc.example.test',chainId:'test-alternate'})
+  await trigger.click(); await expect(dialog.getByRole('textbox',{name:'Chain ID'})).toHaveValue('test-alternate')
+  await page.keyboard.press('Escape'); await expect(dialog).not.toBeVisible(); await expect(trigger).toBeFocused()
+  await trigger.click(); await dialog.getByRole('button',{name:'Reset defaults'}).click()
+  await expect(dialog).not.toBeVisible()
+  expect(await page.evaluate(() => localStorage.getItem('guildhall.network'))).toBeNull()
+  expect(app.txs).toHaveLength(0)
+})
+
+test.describe('without a wallet extension', () => {
+  test.use({walletAvailable:false})
+  test('offers Adena installation on every write entry point', async ({page,app}) => {
+    await page.goto('/')
+    await expect(page.locator('.app-topbar a[href="https://adena.app"]')).toBeVisible()
+    await page.goto('/bounty/1')
+    await expect(page.locator('aside a[href="https://adena.app"]')).toBeVisible()
+    await page.goto('/post')
+    await expect(page.getByRole('link',{name:'Install Adena to post'})).toBeVisible()
+    expect(app.txs).toHaveLength(0)
+  })
+})
