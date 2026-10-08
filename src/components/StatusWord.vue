@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ status: string }>()
+const props = defineProps<{ status: string; claim?: boolean }>()
 const tone: Record<string, string> = {
   open: 'text-woad',
   active: 'text-ink',
@@ -12,6 +12,9 @@ const tone: Record<string, string> = {
   submitted: 'text-woad',
   'changes requested': 'text-woad',
   pending: 'text-ink-soft',
+  closed: 'text-ink-faint',
+  approved: 'text-verdigris',
+  rejected: 'text-wax',
 }
 const words: Record<string, string> = {
   open: 'Open',
@@ -25,9 +28,14 @@ const words: Record<string, string> = {
   paid: 'Paid',
   split: 'Split by arbiter',
   refunded: 'Refunded',
+  closed: 'Closed',
+  approved: 'Paid',
+  rejected: 'Rejected',
 }
+// A pending claim is waiting for a reviewer, not for work to start.
+const claimWords: Record<string, string> = { pending: 'In review' }
 </script>
 
 <template>
-  <span :class="['status-badge', tone[status] ?? 'text-ink-soft']">{{ words[status] ?? status }}</span>
+  <span :class="['status-badge', props.claim && status === 'pending' ? 'text-woad' : tone[status] ?? 'text-ink-soft']">{{ (props.claim && claimWords[status]) || words[status] || status }}</span>
 </template>

@@ -32,6 +32,15 @@ const levels = [
     </section>
 
     <section class="panel panel-pad mt-6">
+      <h2 class="text-2xl mb-4">Campaigns: one task, many people</h2>
+      <div class="space-y-4 leading-relaxed text-ink-soft">
+        <p>Some tasks are worth paying many people for, like writing about a release or translating a page. A campaign sets a reward per person and how many people can earn it, and holds the whole amount in escrow: 10 GNOT each for 100 people holds 1,000 GNOT.</p>
+        <p>Anyone except the poster and reviewers can claim once with a link to their work. A claim reserves a slot until any one reviewer approves it, which pays it straight away, or rejects it, which frees the slot. The poster can close the campaign at any time and get the unclaimed slots back.</p>
+        <p>Each paid claim is written as a work record worth 5% of a bounty milestone, so small repeatable tasks count without outweighing reviewed work.</p>
+      </div>
+    </section>
+
+    <section class="panel panel-pad mt-6">
       <h2 class="text-2xl mb-4">How reputation is scored</h2>
       <div class="space-y-4 leading-relaxed text-ink-soft">
         <p>

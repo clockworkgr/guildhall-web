@@ -138,6 +138,7 @@ async function submit() {
   <div>
     <PageHeading title="Turn an idea into a contribution." eyebrow="Post a bounty" description="Define the work, fund the reward, and let great contributors take it from here." />
 
+    <p class="mb-5 text-sm text-ink-soft">Paying many people for the same small task? <RouterLink to="/campaigns/new" class="underline">Post a campaign</RouterLink> instead.</p>
     <Notice v-if="stats.error.value" tone="error" class="mb-5">{{ stats.error.value }} <button type="button" class="section-link ml-2" @click="stats.reload">Try again</button></Notice>
     <Notice v-if="tokens.error.value" tone="error" class="mb-5">Could not load available tokens: {{ tokens.error.value }} <button type="button" class="section-link ml-2" @click="tokens.reload">Try again</button></Notice>
     <Notice v-if="stats.data.value?.paused" tone="error" class="mb-5">Posting is paused by the Guildhall council right now.</Notice>

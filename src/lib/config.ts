@@ -5,6 +5,7 @@ const STORAGE_KEY = 'guildhall.network'
 
 export const REALM_ROOT = import.meta.env.VITE_REALM_ROOT
 export const BOUNTIES = `${REALM_ROOT}/bounties`
+export const CAMPAIGNS = `${REALM_ROOT}/campaigns`
 export const REPUTATION = `${REALM_ROOT}/reputation`
 export const GOVDAO = `${REALM_ROOT}/govdao`
 export const GNOWEB_URL = import.meta.env.VITE_GNOWEB_URL

@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWallet } from '../composables/wallet'
 import { shortAddr } from '../lib/format'
+import { pageTitle } from '../lib/titles'
 import { REALMS_REPO_URL, defaultNetwork, getNetwork, setNetwork } from '../lib/config'
 import Hallmark from './Hallmark.vue'
 import Icon from './Icon.vue'
@@ -21,14 +22,15 @@ const walletMenu = ref<HTMLElement>()
 const walletButton = ref<HTMLButtonElement>()
 const menuButton = ref<HTMLButtonElement>()
 const dark = ref(document.documentElement.classList.contains('dark'))
-const section = computed(() => route.path === '/' ? 'Overview' : route.path.startsWith('/bounty/') ? 'Bounty details' : route.path.startsWith('/u/') ? 'Contributor profile' : route.path.startsWith('/record/') ? 'Work record' : ({ '/bounties': 'Bounties', '/contributors': 'Contributors', '/post': 'Post a bounty', '/how': 'How it works', '/admin': 'Guild settings' }[route.path] ?? 'Page not found'))
+const section = computed(() => pageTitle(route.path))
 const links = [
   { to: '/', label: 'Overview', icon: 'grid' },
   { to: '/bounties', label: 'Bounties', icon: 'bounty' },
+  { to: '/campaigns', label: 'Campaigns', icon: 'megaphone' },
   { to: '/contributors', label: 'Contributors', icon: 'users' },
 ]
 function activeNav(to: string) {
-  return route.path === to || (to === '/bounties' && route.path.startsWith('/bounty/')) || (to === '/contributors' && (route.path.startsWith('/u/') || route.path.startsWith('/record/')))
+  return route.path === to || (to === '/bounties' && route.path.startsWith('/bounty/')) || (to === '/campaigns' && route.path.startsWith('/campaign')) || (to === '/contributors' && (route.path.startsWith('/u/') || route.path.startsWith('/record/')))
 }
 function toggleTheme() {
   dark.value = !dark.value

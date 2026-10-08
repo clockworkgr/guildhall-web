@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import BountyLedger from '../components/BountyLedger.vue'
+import CampaignLedger from '../components/CampaignLedger.vue'
 import RecordList from '../components/RecordList.vue'
 import Addr from '../components/Addr.vue'
 import Icon from '../components/Icon.vue'
 import QueryState from '../components/QueryState.vue'
-import { board, rep } from '../lib/api'
+import { board, campaigns, rep } from '../lib/api'
 import { formatUnits } from '../lib/format'
 import { useQuery } from '../composables/useQuery'
 const stats = useQuery(() => board.stats())
 const repStats = useQuery(() => rep.stats())
 const open = useQuery(() => board.list({ status: 'open', limit: 5 }))
+const openCampaigns = useQuery(() => campaigns.list({ status: 'open', limit: 3 }))
 const recent = useQuery(() => rep.records({ limit: 4 }))
 const top = useQuery(() => rep.top(4))
 </script>
@@ -37,6 +39,10 @@ const top = useQuery(() => rep.top(4))
       <BountyLedger v-else-if="open.data.value?.items.length" :items="open.data.value.items" />
       <QueryState v-else title="The next opportunity starts with you" description="Fund a task and invite the community to build it."><RouterLink to="/post" class="btn">Post the first bounty<Icon name="plus" :size="16" /></RouterLink></QueryState>
       <div class="mt-6 flex items-center gap-3 text-xs text-ink-soft"><Icon name="shield" :size="16" class="text-verdigris" /><span>Rewards stay in escrow until the work is approved.</span></div>
+      <section v-if="openCampaigns.data.value?.items.length" class="mt-10" aria-labelledby="campaigns-h">
+        <div class="section-heading"><div><h2 id="campaigns-h">Quick tasks, many hands</h2><p class="text-sm text-ink-soft mt-1.5">Paid per person, for anyone who does the task.</p></div><RouterLink to="/campaigns" class="section-link shrink-0">View all<Icon name="arrow" :size="15" /></RouterLink></div>
+        <CampaignLedger :items="openCampaigns.data.value.items" />
+      </section>
       <QueryState v-if="stats.error.value" class="mt-6" :error="stats.error.value" compact @retry="stats.reload" />
       <QueryState v-if="repStats.error.value" class="mt-6" :error="repStats.error.value" compact @retry="repStats.reload" />
     </section>

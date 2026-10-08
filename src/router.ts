@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { pageTitle } from './lib/titles'
 
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -8,6 +9,9 @@ export const router = createRouter({
     { path: '/bounties', component: () => import('./pages/BoardPage.vue') },
     { path: '/bounty/:id', component: () => import('./pages/BountyPage.vue'), props: true },
     { path: '/post', component: () => import('./pages/PostPage.vue') },
+    { path: '/campaigns', component: () => import('./pages/CampaignsPage.vue') },
+    { path: '/campaigns/new', component: () => import('./pages/PostCampaignPage.vue') },
+    { path: '/campaign/:id', component: () => import('./pages/CampaignPage.vue'), props: true },
     { path: '/contributors', component: () => import('./pages/ContributorsPage.vue') },
     { path: '/u/:address', component: () => import('./pages/ProfilePage.vue'), props: true },
     { path: '/record/:id', component: () => import('./pages/RecordPage.vue'), props: true },
@@ -18,6 +22,5 @@ export const router = createRouter({
 })
 
 router.afterEach((to) => {
-  const title = to.path === '/' ? 'Overview' : to.path.startsWith('/bounty/') ? 'Bounty details' : to.path.startsWith('/u/') ? 'Contributor profile' : to.path.startsWith('/record/') ? 'Work record' : ({ '/bounties': 'Bounties', '/contributors': 'Contributors', '/post': 'Post a bounty', '/how': 'How it works', '/admin': 'Guild settings' }[to.path] ?? 'Page not found')
-  document.title = `${title} · Guildhall`
+  document.title = `${pageTitle(to.path)} · Guildhall`
 })

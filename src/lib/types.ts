@@ -162,6 +162,67 @@ export interface WorkRecord {
   voidReason: string
 }
 
+export type CampaignStatus = 'open' | 'closed'
+export type ClaimStatus = 'pending' | 'approved' | 'rejected'
+
+export interface CampaignSummary extends Denom {
+  id: number
+  title: string
+  tags: string[]
+  status: CampaignStatus
+  poster: string
+  reward: number
+  slots: number
+  paid: number
+  pending: number
+  rejected: number
+  refunded: number
+  freeSlots: number
+  claims: number
+  total: number
+  escrowed: number
+  paidOut: number
+  deadline: string | null
+  createdAt: string | null
+}
+
+export interface Campaign extends CampaignSummary {
+  description: string
+  link: string
+  reviewers: string[]
+  closedAt: string | null
+  claimShareBps: number
+}
+
+export interface Claim {
+  number: number
+  claimant: string
+  proof: string
+  status: ClaimStatus
+  at: string | null
+  reviewedBy: string
+  reviewedAt: string | null
+  reason: string
+}
+
+export interface CampaignStats {
+  total: number
+  open: number
+  closed: number
+  escrow: (Denom & { amount: number })[]
+  council: string
+  paused: boolean
+  realmAddress: string
+  claimShareBps: number
+  maxSlots: number
+}
+
+export interface UserCampaign {
+  campaign: CampaignSummary
+  roles: string[]
+  claim: Claim | null
+}
+
 export interface Candidate {
   address: string
   score: number

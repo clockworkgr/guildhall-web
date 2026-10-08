@@ -8,7 +8,7 @@ import QueryState from '../components/QueryState.vue'
 import Icon from '../components/Icon.vue'
 import { workUrl } from '../lib/links'
 import { rep } from '../lib/api'
-import { BOUNTIES, REPUTATION, gnowebUrl } from '../lib/config'
+import { BOUNTIES, CAMPAIGNS, REPUTATION, gnowebUrl } from '../lib/config'
 import { percent } from '../lib/format'
 import { useQuery } from '../composables/useQuery'
 import { useTokens } from '../composables/tokens'
@@ -20,6 +20,11 @@ const { info } = useTokens()
 
 const bountyId = computed(() => (r.value?.source === BOUNTIES ? r.value.ref.split('/')[0] : ''))
 const milestone = computed(() => r.value?.ref.split('/')[1] ?? '')
+// Campaign records carry "c<campaign>/<claim>".
+const campaignRef = computed(() => {
+  const m = r.value?.source === CAMPAIGNS ? /^c(\d+)\/(\d+)$/.exec(r.value.ref) : null
+  return m ? { id: m[1], claim: m[2] } : null
+})
 </script>
 
 <template>
@@ -55,6 +60,10 @@ const milestone = computed(() => r.value?.ref.split('/')[1] ?? '')
       <template v-if="bountyId">
         <dt class="text-ink-soft">From</dt>
         <dd><RouterLink :to="`/bounty/${bountyId}`" class="underline">Bounty {{ bountyId }}</RouterLink>, milestone {{ milestone }}</dd>
+      </template>
+      <template v-else-if="campaignRef">
+        <dt class="text-ink-soft">From</dt>
+        <dd><RouterLink :to="`/campaign/${campaignRef.id}`" class="underline">Campaign {{ campaignRef.id }}</RouterLink>, claim {{ campaignRef.claim }}</dd>
       </template>
       <template v-else>
         <dt class="text-ink-soft">Written by</dt><dd class="figures break-all">{{ r.source }}</dd>

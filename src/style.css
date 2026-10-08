@@ -129,6 +129,9 @@
 .bounty-card:hover { border-color: color-mix(in srgb,var(--color-woad) 40%,var(--color-rule)); box-shadow: 0 2px 8px #14291d05; }
 .bounty-card-title { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; }
 .bounty-avatar { display: flex; align-items: center; justify-content: center; background: var(--color-stone); border: 1px solid var(--color-rule); border-radius: 10px; width: 46px; height: 46px; flex-shrink: 0; }
+.slot-meter { display: flex; width: 8rem; height: 5px; margin-left: auto; overflow: hidden; border-radius: 999px; background: var(--color-rule); }
+.slot-meter-paid { background: var(--color-verdigris); }
+.slot-meter-pending { background: color-mix(in srgb,var(--color-woad) 55%,transparent); }
 .record-row { display: flex; gap: .9rem; align-items: center; padding: 1.15rem 1.3rem; color: var(--color-ink); }
 .record-row:hover { background: var(--color-stone); }
 .record-row + .record-row { border-top: 1px solid var(--color-rule); }

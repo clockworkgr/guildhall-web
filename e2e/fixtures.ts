@@ -1,5 +1,5 @@
 import { test as base, expect, type Page } from '@playwright/test'
-import type { Bounty, WorkRecord, Profile, Standing, Token } from '../src/lib/types'
+import type { Bounty, Campaign, Claim, WorkRecord, Profile, Standing, Token } from '../src/lib/types'
 
 export const addresses = {
   poster: `g1${'a'.repeat(38)}`, worker: `g1${'c'.repeat(38)}`, reviewer: `g1${'d'.repeat(38)}`,
@@ -32,10 +32,26 @@ export function record(id: number): WorkRecord {
     ref: '5/1', source: `${realmRoot}/bounties`, signedBy: addresses.reviewer, arbitrated: false, height: 1234, at, voided: id === 2, voidReason: id === 2 ? 'Duplicate contribution' : '', }
 }
 
+export function campaign(id: number, status: Campaign['status'] = 'open'): Campaign {
+  const slots = id === 1 ? 100 : 5, paid = status === 'closed' ? slots : id === 1 ? 1 : 0, pending = status === 'open' && id === 1 ? 1 : 0
+  return { id, title: ({1: 'Write about Guildhall', 2: 'Translate the onboarding page'} as Record<number,string>)[id] ?? `Community campaign ${id}`,
+    description: 'Post about **Guildhall** with a link to it.', link: 'https://guildhall.clockwork.gr', tags: ['social'], status, poster: addresses.poster,
+    denom: 'ugnot', symbol: 'GNOT', decimals: 6, isGRC20: false, reward: 10_000_000, slots, paid, pending, rejected: id === 1 ? 1 : 0, refunded: 0,
+    freeSlots: status === 'open' ? slots - paid - pending : 0, claims: id === 1 ? 3 : slots, total: slots * 10_000_000,
+    escrowed: (slots - paid) * 10_000_000, paidOut: paid * 10_000_000, deadline: null, createdAt: at, closedAt: status === 'closed' ? at : null,
+    reviewers: [addresses.reviewer], claimShareBps: 500 }
+}
+export function claim(number: number, claimant: string, status: Claim['status']): Claim {
+  return { number, claimant, proof: `https://x.com/user/status/${number}`, status, at,
+    reviewedBy: status === 'pending' ? '' : addresses.reviewer, reviewedAt: status === 'pending' ? null : at, reason: status === 'rejected' ? 'The post is not public.' : '' }
+}
+
 /** The actual RPC transport and Adena interface are intercepted; application code runs unchanged. */
 export class AppHarness {
   bounties: Bounty[] = [bounty(1), bounty(2, 'active'), bounty(3, 'active'), bounty(4, 'active'), bounty(5, 'completed'), bounty(6, 'cancelled'), bounty(7, 'active')]
   records: WorkRecord[] = [record(1), record(2)]
+  campaigns: Campaign[] = [campaign(1), campaign(2, 'closed')]
+  claims: Record<number, Claim[]> = { 1: [claim(1, addresses.worker, 'approved'), claim(2, addresses.visitor, 'pending'), claim(3, addresses.reviewer2, 'rejected')], 2: [] }
   seeds = [addresses.reviewer]
   admin = addresses.council
   council = addresses.council
@@ -74,6 +90,23 @@ export class AppHarness {
         return paginate([...this.bounties].reverse().map(b => ({ bounty: b, roles: [b.poster === a ? 'poster' : '', b.assignee === a ? 'contributor' : '', b.reviewers.includes(a) ? 'reviewer' : '', b.applicationList.some(app => app.applicant === a) ? 'applicant' : ''].filter(Boolean) })).filter(b => b.roles.length))
       }
     }
+    if (realm.endsWith('/campaigns')) {
+      if (p === '/api/stats') return { total: this.campaigns.length, open: this.campaigns.filter(c => c.status === 'open').length, closed: this.campaigns.filter(c => c.status === 'closed').length, escrow: [], council: this.council, paused: this.paused, realmAddress: addresses.realm, claimShareBps: 500, maxSlots: 1000 }
+      if (p === '/api/campaigns') return paginate([...this.campaigns].reverse().filter(c => (!q.get('status') || q.get('status') === 'all' || c.status === q.get('status')) && (!q.get('tag') || c.tags.includes(q.get('tag')!))))
+      const m = /^\/api\/campaign\/(\d+)(?:\/(claims|claimant)(?:\/(\w+))?)?$/.exec(p)
+      if (m) {
+        const c = this.campaigns.find(x => x.id === Number(m[1]))
+        if (!c) return { error: 'not found' }
+        const claims = [...(this.claims[c.id] ?? [])].reverse()
+        if (m[2] === 'claims') return paginate(claims.filter(cl => !q.get('status') || q.get('status') === 'all' || cl.status === q.get('status')))
+        if (m[2] === 'claimant') return { claim: claims.find(cl => cl.claimant === m[3]) ?? null }
+        return c
+      }
+      if (p.startsWith('/api/user/')) {
+        const a = p.split('/').pop()!
+        return paginate([...this.campaigns].reverse().map(c => ({ campaign: c, roles: [c.poster === a ? 'poster' : '', c.reviewers.includes(a) ? 'reviewer' : ''].filter(Boolean), claim: null })).filter(x => x.roles.length))
+      }
+    }
     if (realm.endsWith('/reputation')) {
       if (p === '/api/stats') return { records: this.records.length, contributors: 3, seeds: this.seeds.length, admin: this.admin, params: {base: 100, trustThreshold: 500, trustFloorBps: 0, selfFundedFactorBps: 0}, writers: [`${realmRoot}/bounties`] }
       if (p === '/api/seeds') return { items: this.seeds }
@@ -87,6 +120,7 @@ export class AppHarness {
   }
   apply(tx: Transaction) {
     for (const {value: v} of tx.messages) {
+      if (v.pkg_path.endsWith('/campaigns')) { this.applyCampaign(v); continue }
       const args = v.args, id = Number(args[0]), b = this.get(id)
       if (v.func === 'PostBounty' || v.func === 'PostBountyGRC20') {
         const grc = v.func.endsWith('GRC20'), a = grc ? args.slice(1) : args, created = bounty(Math.max(...this.bounties.map(x => x.id), 0) + 1)
@@ -120,6 +154,24 @@ export class AppHarness {
         }
       }
     }
+  }
+  applyCampaign(v: Message['value']) {
+    const args = v.args
+    if (v.func === 'PostCampaign' || v.func === 'PostCampaignGRC20') {
+      const grc = v.func.endsWith('GRC20'), a = grc ? args.slice(1) : args, created = campaign(Math.max(...this.campaigns.map(x => x.id), 0) + 1)
+      const reward = Number(a[5]), slots = Number(a[6])
+      Object.assign(created, {title: a[0], description: a[1], link: a[2], tags: a[3]!.split(',').map(t => t.trim()).filter(Boolean), poster: v.caller,
+        reviewers: a[4] ? a[4].split(',') : [v.caller], reward, slots, paid: 0, pending: 0, rejected: 0, freeSlots: slots, claims: 0, total: reward * slots, escrowed: reward * slots, paidOut: 0,
+        deadline: Number(a[7]) ? '2026-11-05T10:00:00Z' : null})
+      if (grc) Object.assign(created, {denom: args[0], symbol: token.symbol, decimals: token.decimals, isGRC20: true})
+      this.campaigns.push(created); this.claims[created.id] = []; return
+    }
+    const c = this.campaigns.find(x => x.id === Number(args[0]))!, claims = this.claims[c.id]!
+    if (v.func === 'Claim') { claims.push(claim(claims.length + 1, v.caller, 'pending')); Object.assign(claims.at(-1)!, {proof: args[1]}); c.claims++; c.pending++; c.freeSlots-- }
+    const cl = claims.find(x => x.number === Number(args[1]))
+    if (v.func === 'ApproveClaim') { Object.assign(cl!, {status: 'approved', reviewedBy: v.caller, reviewedAt: at}); c.pending--; c.paid++; c.escrowed -= c.reward; c.paidOut += c.reward }
+    if (v.func === 'RejectClaim') { Object.assign(cl!, {status: 'rejected', reviewedBy: v.caller, reviewedAt: at, reason: args[2]}); c.pending--; c.rejected++; c.freeSlots++ }
+    if (v.func === 'Close') { c.refunded += c.freeSlots; c.escrowed -= c.freeSlots * c.reward; c.freeSlots = 0; c.status = 'closed'; c.closedAt = at }
   }
   async setWallet(address: string, chainId = 'guildhall-test') {
     await this.page.evaluate(({address, chainId}) => {
